@@ -3,14 +3,20 @@
 from __future__ import annotations
 
 import time
+import warnings
 
 import pandas as pd
 
-from .baselines import METHODS, fingerprints_for, fit_predict, predict, select
+from .baselines import FOREST_SELECTION, METHODS, fingerprints_for, fit_predict, predict, select
 from .featurize import Fingerprints
 from .io import load
 from .report import Comparison, Report
 from .stats import MIN_CELLS, PRIMARY, corrected_t, holm, improvement, metrics
+
+INNER_CV_WARNING = (
+    "forest_selection='inner-cv' fits every forest config once per inner fold, then refits the winner: "
+    "about 5x slower than the default out-of-bag selection. The forest will take its time."
+)
 
 
 def run(
@@ -25,12 +31,18 @@ def run(
     seed: int = 0,
     n_jobs: int = -1,
     alpha: float = 0.05,
+    forest_selection: str = "oob",
 ) -> Report:
     """Fit the mean, kNN and forest baselines on the user's folds and test the user's model against each.
 
     See `forestgump.io.load` for the input contract. Hyperparameters are chosen per cell from that cell's training
-    rows only (the forest by out-of-bag score, kNN by inner CV); test rows are only ever predicted.
+    rows only; test rows are only ever predicted. kNN always uses inner CV. The forest uses its out-of-bag score
+    by default (one fit per config); forest_selection="inner-cv" uses inner CV instead, at about 5x the time.
     """
+    if forest_selection not in FOREST_SELECTION:
+        raise ValueError(f"forest_selection must be one of {FOREST_SELECTION}, got {forest_selection!r}")
+    if forest_selection == "inner-cv":
+        warnings.warn(INNER_CV_WARNING, stacklevel=2)
     ds = load(df, smiles=smiles, target=target, fold=fold, pred=pred, repeat=repeat, task=task)
     fps = Fingerprints(ds.mols, ds.mol_index)
     rows, selections, predictions = [], [], []
@@ -41,7 +53,7 @@ def run(
         rows.append(base | {"method": "user"} | metrics(ds.task, ds.y[cell.test_idx], ds.pred[cell.test_idx]))
         for method in METHODS:
             start = time.perf_counter()
-            sel = select(method, ds.task, fps, ds.y, cell.train_idx, seed, n_jobs)
+            sel = select(method, ds.task, fps, ds.y, cell.train_idx, seed, n_jobs, forest_selection)
             if sel.model is None:
                 X = fingerprints_for(fps, sel.params)
                 p, model = fit_predict(
@@ -82,4 +94,5 @@ def run(
         alpha=alpha,
         seed=seed,
         classes=ds.classes,
+        forest_selection=forest_selection,
     )

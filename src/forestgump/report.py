@@ -44,6 +44,11 @@ class Report:
     alpha: float
     seed: int
     classes: tuple | None = None
+    forest_selection: str = "oob"
+
+    @property
+    def _forest_selection_text(self) -> str:
+        return "out-of-bag score" if self.forest_selection == "oob" else "inner CV"
 
     def _comparison(self, method: str) -> Comparison | None:
         return next((c for c in self.comparisons if c.method == method), None)
@@ -68,7 +73,7 @@ class Report:
         out.append(
             f"Design: {self.n_cells} paired test sets (repeat x fold); every method is scored on the same rows. "
             f"Baseline hyperparameters are chosen per test set from its training rows only "
-            f"(the forest by out-of-bag score, kNN by inner CV). "
+            f"(the forest by {self._forest_selection_text}, kNN by inner CV). "
             f"Primary metric: {self.primary} ({direction} is better)."
         )
 
@@ -132,7 +137,7 @@ class Report:
         picks = Counter(
             ", ".join(f"{k}={v}" for k, v in s["params"].items()) for s in self.selections if s["method"] == "forest"
         )
-        lines = [f"Forest hyperparameters chosen by out-of-bag score (of {self.n_cells} test sets):"]
+        lines = [f"Forest hyperparameters chosen by {self._forest_selection_text} (of {self.n_cells} test sets):"]
         lines += [f"  {n} x  {cfg}" for cfg, n in picks.most_common()]
         return "\n".join(lines)
 
@@ -151,6 +156,7 @@ class Report:
                 "mean_test_train_ratio": self.test_train_ratio,
                 "alpha": self.alpha,
                 "seed": self.seed,
+                "forest_selection": self.forest_selection,
                 "verdict": self.verdict,
                 "forest_seconds": self.forest_seconds,
                 "per_test_set": self.table.to_dict(orient="records"),

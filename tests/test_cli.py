@@ -27,3 +27,10 @@ def test_bad_input_exits_2(tmp_path, capsys):
     demo_frame("noise").to_csv(path, index=False)
     assert main(["run", str(path), "--pred", "nope"]) == EXIT_BAD_INPUT
     assert "missing columns" in capsys.readouterr().err
+
+
+def test_forest_inner_cv_prints_one_clean_warning(small_forest, recwarn, capsys):
+    assert main(["demo", "--n-jobs", "2", "--forest-inner-cv", "--seriously"]) == 0
+    err = capsys.readouterr().err
+    assert err.count("about 5x slower") == 1 and "UserWarning" not in err
+    assert not [w for w in recwarn if "inner-cv" in str(w.message)]

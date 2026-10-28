@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import argparse
 import sys
+import warnings
 
 import pandas as pd
 
 from . import __version__, jokes
-from .core import run
+from .core import INNER_CV_WARNING, run
 from .demo import MODELS, demo_frame
 from .io import TASKS, InputError
 
@@ -54,6 +55,11 @@ def _shared(p: argparse.ArgumentParser) -> None:
     p.add_argument("--seriously", action="store_true", help="plain output, no jokes")
     p.add_argument("--json", metavar="PATH", help="write every number to a JSON file")
     p.add_argument(
+        "--forest-inner-cv",
+        action="store_true",
+        help="pick the forest's hyperparameters by inner CV instead of out-of-bag score (about 5x slower)",
+    )
+    p.add_argument(
         "--fail-if-forest-wins",
         action="store_true",
         help=f"exit {EXIT_FOREST_WON} if the forest won, so a CI pipeline fails when your model loses",
@@ -70,8 +76,19 @@ def main(argv: list[str] | None = None) -> int:
     else:
         frame = pd.read_csv(args.csv)
         columns = {k: getattr(args, k) for k in ("smiles", "target", "fold", "pred", "repeat", "task")}
+    if args.forest_inner_cv:
+        print(f"forestgump: {INNER_CV_WARNING}", file=sys.stderr, flush=True)
     try:
-        report = run(frame, seed=args.seed, n_jobs=args.n_jobs, alpha=args.alpha, **columns)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="forest_selection='inner-cv'")  # already printed above
+            report = run(
+                frame,
+                seed=args.seed,
+                n_jobs=args.n_jobs,
+                alpha=args.alpha,
+                forest_selection="inner-cv" if args.forest_inner_cv else "oob",
+                **columns,
+            )
     except InputError as exc:
         print(f"forestgump: {exc}", file=sys.stderr)
         return EXIT_BAD_INPUT

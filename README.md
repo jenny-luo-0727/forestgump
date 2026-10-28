@@ -73,7 +73,9 @@ only**. Test rows are only ever predicted.
 - **Large Lookup Model** uses inner cross-validation, which takes milliseconds for kNN: 5 folds, or 3 below 50
   training rows.
 - **The Forest** fits each of its 12 configs once and keeps the one with the best out-of-bag score. Every tree
-  skips about a third of the training rows, so the forest gets a validation score for free.
+  skips about a third of the training rows, so the forest gets a validation score for free. If you'd rather tune
+  it like everything else, `--forest-inner-cv` uses inner cross-validation instead. That fits each config once
+  per inner fold and then refits the winner, so it is about 5× slower.
 
 | name | what it is | grid |
 |---|---|---|
@@ -106,6 +108,7 @@ number, the hyperparameters chosen on each test set, and the baselines' predicti
 |---|---|
 | `--seriously` | plain output with no jokes, for logs and papers |
 | `--brag "fine-tuned for a week on a TPU pod"` | changes how the forest describes your training |
+| `--forest-inner-cv` | picks the forest's hyperparameters by inner CV instead of out-of-bag score. About 5× slower, and it warns you. |
 | `--fail-if-forest-wins` | exits 1 if the forest won, so a CI pipeline goes red when your model loses |
 | `--task regression\|binary` | overrides the task. By default a target with 2 values is binary. |
 | `--seed`, `--n-jobs`, `--alpha` | what you'd expect |

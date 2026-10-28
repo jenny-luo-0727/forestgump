@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 import forestgump
 from forestgump.demo import demo_frame
@@ -7,11 +8,13 @@ from forestgump.demo import demo_frame
 POISON = 1e6
 
 
-def test_test_rows_never_reach_selection_or_fitting(small_forest):
+@pytest.mark.filterwarnings("ignore:forest_selection='inner-cv'")
+@pytest.mark.parametrize("forest_selection", ["oob", "inner-cv"])
+def test_test_rows_never_reach_selection_or_fitting(small_forest, forest_selection):
     """Poison one fold's labels. That fold's test set must not see them; every other fold trains on them."""
     df = demo_frame("noise").drop(columns="repeat")
     df.loc[df["fold"] == 0, "target"] = POISON
-    report = forestgump.run(df, n_jobs=2)
+    report = forestgump.run(df, n_jobs=2, forest_selection=forest_selection)
     clean = report.table.query("method != 'user'").loc[lambda t: t["fold"] == 0, "cell"].unique()
     assert len(clean) == 1
     cell = clean[0]
@@ -40,3 +43,16 @@ def test_binary_runs(small_forest):
     assert report.task == "binary" and report.primary == "roc_auc"
     assert set(report.table.columns) >= {"roc_auc", "accuracy"}
     assert isinstance(report.table, pd.DataFrame) and len(report.table) == 5 * 4
+
+
+def test_forest_inner_cv_warns_and_is_reported(small_forest):
+    with pytest.warns(UserWarning, match="about 5x slower"):
+        report = forestgump.run(demo_frame("noise"), repeat="repeat", n_jobs=2, forest_selection="inner-cv")
+    assert report.to_dict()["forest_selection"] == "inner-cv"
+    text = report.render()
+    assert "the forest by inner CV" in text and "Forest hyperparameters chosen by inner CV" in text
+
+
+def test_unknown_forest_selection_is_refused():
+    with pytest.raises(ValueError, match="forest_selection"):
+        forestgump.run(demo_frame("noise"), repeat="repeat", forest_selection="vibes")

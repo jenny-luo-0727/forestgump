@@ -16,6 +16,7 @@ from .stats import LOWER_IS_BETTER, PRIMARY, metrics
 
 N_TREES = 500
 METHODS = ("mean", "knn", "forest")
+FOREST_SELECTION = ("oob", "inner-cv")
 
 GRIDS: dict[str, list[dict]] = {
     "mean": [{}],
@@ -88,11 +89,11 @@ def fit_predict(method, task, params, X, y, train_idx, test_idx, seed, n_jobs):
     return predict(model, task, X_pred), model
 
 
-def _inner_cv_score(method, task, params, X, y, train_idx, seed) -> float:
+def _inner_cv_score(method, task, params, X, y, train_idx, seed, n_jobs=1) -> float:
     """Mean primary metric over inner CV folds of the training rows."""
     scores = []
     for a, b in _inner_splits(task, y[train_idx], seed).split(train_idx, y[train_idx]):
-        p, _ = fit_predict(method, task, params, X, y, train_idx[a], train_idx[b], seed, n_jobs=1)
+        p, _ = fit_predict(method, task, params, X, y, train_idx[a], train_idx[b], seed, n_jobs)
         scores.append(metrics(task, y[train_idx[b]], p)[PRIMARY[task]])
     return float(np.mean(scores))
 
@@ -128,12 +129,14 @@ class Selection:
     model: object = None  # the forest winner, already fitted on every training row
 
 
-def select(method, task, fps, y, train_idx, seed, n_jobs) -> Selection:
+def select(method, task, fps, y, train_idx, seed, n_jobs, forest_selection="oob") -> Selection:
     """Pick a method's config using only the rows in train_idx.
 
-    The forest fits each of its configs once on all training rows and is judged by its out-of-bag score, which
-    costs nothing extra and needs no inner CV; the winning forest is kept, so nothing is refit. kNN fits take
-    milliseconds, so it uses inner CV. Ties go to the earlier config in grid order, so selection is deterministic.
+    By default the forest fits each of its configs once on all training rows and is judged by its out-of-bag
+    score, which costs nothing extra; the winning forest is kept, so nothing is refit. With
+    forest_selection="inner-cv" it is judged by inner CV like kNN instead, then refit: k forests per config plus
+    one, about 5x the forest time. kNN fits take milliseconds, so it always uses inner CV. Ties go to the earlier
+    config in grid order, so selection is deterministic.
     """
     grid = GRIDS[method]
     primary = PRIMARY[task]
@@ -142,8 +145,10 @@ def select(method, task, fps, y, train_idx, seed, n_jobs) -> Selection:
     best, scores = None, []
     for params in grid:
         X = fingerprints_for(fps, params)
-        if method == "forest":
+        if method == "forest" and forest_selection == "oob":
             score, model = _fit_forest_with_oob(task, params, X, y, train_idx, seed, n_jobs)
+        elif method == "forest":
+            score, model = _inner_cv_score(method, task, params, X, y, train_idx, seed, n_jobs), None
         else:
             score, model = _inner_cv_score(method, task, params, X, y, train_idx, seed), None
         scores.append(score)
