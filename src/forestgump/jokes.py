@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import random
+
 TAGLINE = "Life is like a box of baselines."
 DEFAULT_BRAG = "trained on 8×H100 for 3 days"  # noqa: RUF001
 
@@ -23,6 +25,11 @@ FOREST_FACTS = (
     "A regression forest cannot predict outside the range of its training labels. It does not hallucinate.",
     "The forest's attention mechanism is called max_features.",
     "The forest was not pretrained. The forest was not fine-tuned. The forest was planted.",
+    "Nothing backpropagates in a forest. Information only moves forward, like nature intended.",
+    "Long before it was fashionable, the forest was already doing stochastic feature selection.",
+    "No instruction tuning was needed for the forest to understand 'predict the target.'",
+    "The forest discovered nonlinearity without inventing GELU.",
+    "The forest discovered interactions without inventing attention.",
 )
 
 MODEL_CARD = """THE FOREST: MODEL CARD
@@ -67,5 +74,6 @@ LOST_TO_MEAN = "Your model also lost to the mean. The mean is one number."
 LOST_TO_KNN = "Your model also lost to the nearest-neighbor lookup. It is a lookup table."
 
 
-def fact(seed: int) -> str:
-    return "Forest fact: " + FOREST_FACTS[seed % len(FOREST_FACTS)]
+def fact() -> str:
+    """A different fact each run. Only the jokes are random; every number in the report is seeded."""
+    return "Forest fact: " + random.choice(FOREST_FACTS)

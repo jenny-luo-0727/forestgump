@@ -89,7 +89,7 @@ class Report:
         if not seriously:
             n_trees = next(s["params"]["n_estimators"] for s in self.selections if s["method"] == "forest")
             out += ["", jokes.MODEL_CARD.format(n_trees=n_trees, n_leaves=self.forest_leaves)]
-            out += ["", jokes.fact(self.seed), "", jokes.TAGLINE]
+            out += ["", jokes.fact(), "", jokes.TAGLINE]
         return "\n".join(out)
 
     def _tests_frame(self, names: dict) -> pd.DataFrame:
