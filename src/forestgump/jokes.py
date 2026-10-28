@@ -70,8 +70,9 @@ def refuse(n_cells: int) -> str:
     return f"The forest declines to be judged on n={n_cells}. Come back with at least 3 folds."
 
 
-LOST_TO_MEAN = "Your model also lost to the mean. The mean is one number."
-LOST_TO_KNN = "Your model also lost to the nearest-neighbor lookup. It is a lookup table."
+# These follow any forest verdict: a model can beat the forest and still lose to kNN or the mean.
+LOST_TO_MEAN = "Your model lost to the mean. The mean is one number."
+LOST_TO_KNN = "Your model lost to the nearest-neighbor lookup. It is a lookup table."
 
 
 def fact() -> str:

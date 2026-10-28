@@ -6,10 +6,14 @@ from forestgump.report import Comparison, Report
 from forestgump.stats import PairedTest
 
 
-def report(forest_delta, forest_p, mean_delta=0.0, mean_p=1.0, n_cells=5):
+def report(forest_delta, forest_p, mean_delta=0.0, mean_p=1.0, n_cells=5, knn_delta=0.0, knn_p=1.0):
     tests = []
     if n_cells >= 3:
-        for method, delta, p in (("mean", mean_delta, mean_p), ("knn", 0.0, 1.0), ("forest", forest_delta, forest_p)):
+        for method, delta, p in (
+            ("mean", mean_delta, mean_p),
+            ("knn", knn_delta, knn_p),
+            ("forest", forest_delta, forest_p),
+        ):
             tests.append(Comparison(method, PairedTest(n_cells, delta, delta - 1, delta + 1, 1.0, p, 1.0), p))
     table = pd.DataFrame({"cell": [0], "method": ["user"], "rmse": [1.0]})
     return Report(
@@ -71,3 +75,8 @@ def test_seriously_has_no_jokes():
 def test_the_full_table_comes_before_the_verdict():
     text = report(-0.5, 0.001).render()
     assert text.index("Per-test-set results") < text.index("The forest won.")
+
+
+def test_beating_the_forest_but_losing_to_knn():
+    text = report(0.5, 0.001, knn_delta=-0.2, knn_p=0.01).render()
+    assert "cannot clap" in text and jokes.LOST_TO_KNN in text
