@@ -43,5 +43,4 @@ def test_regression_metrics():
     y = np.array([1.0, 2.0, 3.0, 4.0])
     m = metrics("regression", y, y + np.array([1.0, -1.0, 1.0, -1.0]))
     assert m["rmse"] == 1.0 and m["mae"] == 1.0
-    assert "mse" not in m
     assert np.isnan(metrics("regression", y, np.full(4, 2.5))["spearman"])

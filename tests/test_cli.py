@@ -10,7 +10,7 @@ def test_demo_noise_loses_and_ci_fails(small_forest, tmp_path, capsys):
     assert "The forest won." in capsys.readouterr().out
     result = json.loads(out.read_text())
     assert result["verdict"] == "lose" and result["n_test_sets"] == 5
-    assert main(["demo", "--n-jobs", "2", "--ci", "--seriously"]) == EXIT_FOREST_WON
+    assert main(["demo", "--n-jobs", "2", "--fail-if-forest-wins", "--seriously"]) == EXIT_FOREST_WON
 
 
 def test_run_on_a_csv(small_forest, tmp_path, capsys):

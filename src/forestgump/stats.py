@@ -15,7 +15,7 @@ MIN_CELLS = 3
 
 
 def metrics(task: str, y: np.ndarray, p: np.ndarray) -> dict[str, float]:
-    """Score one test set. Regression reports RMSE, never MSE. Spearman is NaN when a prediction is constant."""
+    """Score one test set. Spearman is NaN when a prediction is constant."""
     if task == "binary":
         return {"roc_auc": float(roc_auc_score(y, p)), "accuracy": float(accuracy_score(y, p >= 0.5))}
     spearman = np.nan if np.ptp(p) == 0 or np.ptp(y) == 0 else float(stats.spearmanr(y, p).statistic)

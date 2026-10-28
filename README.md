@@ -2,10 +2,14 @@
 
 *Life is like a box of baselines.*
 
-You trained a model for 3 days on 8×H100. Did it beat a random forest?
+**Morgan-fingerprint baselines for cheminformatics models.**
 
-forestgump takes your molecules, your labels, your cross-validation folds and your model's out-of-fold
-predictions. It fits three baselines on **exactly the same folds**, then runs a paired test to decide whether your
+You trained a molecular property model for 3 days on 8×H100. Did it beat a random forest trained on Morgan
+fingerprints?
+
+forestgump takes your molecules as SMILES, plus your labels, your cross-validation folds and your model's
+out-of-fold predictions. It fits three baselines on **exactly the same folds**: the training mean, Tanimoto kNN on
+Morgan fingerprints, and a random forest on Morgan fingerprints. Then it runs a paired test to decide whether your
 model beat the forest.
 
 ```
@@ -102,7 +106,7 @@ number, the hyperparameters chosen on each test set, and the baselines' predicti
 |---|---|
 | `--seriously` | plain output with no jokes, for logs and papers |
 | `--brag "fine-tuned for a week on a TPU pod"` | changes how the forest describes your training |
-| `--ci` | exits 1 if the forest won, so the forest can live in your CI |
+| `--fail-if-forest-wins` | exits 1 if the forest won, so a CI pipeline goes red when your model loses |
 | `--task regression\|binary` | overrides the task. By default a target with 2 values is binary. |
 | `--seed`, `--n-jobs`, `--alpha` | what you'd expect |
 

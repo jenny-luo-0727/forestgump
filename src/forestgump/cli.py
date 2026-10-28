@@ -54,7 +54,9 @@ def _shared(p: argparse.ArgumentParser) -> None:
     p.add_argument("--seriously", action="store_true", help="plain output, no jokes")
     p.add_argument("--json", metavar="PATH", help="write every number to a JSON file")
     p.add_argument(
-        "--ci", action="store_true", help=f"exit {EXIT_FOREST_WON} if the forest won (put the forest in your CI)"
+        "--fail-if-forest-wins",
+        action="store_true",
+        help=f"exit {EXIT_FOREST_WON} if the forest won, so a CI pipeline fails when your model loses",
     )
 
 
@@ -76,7 +78,7 @@ def main(argv: list[str] | None = None) -> int:
     print(report.render(seriously=args.seriously, brag=args.brag))
     if args.json:
         report.to_json(args.json)
-    return EXIT_FOREST_WON if args.ci and report.verdict == "lose" else 0
+    return EXIT_FOREST_WON if args.fail_if_forest_wins and report.verdict == "lose" else 0
 
 
 if __name__ == "__main__":
