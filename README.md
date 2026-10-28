@@ -39,7 +39,7 @@ The tie is not a bug. Five folds is not much evidence, and the test is built not
 
 You need one CSV with one row per molecule. Its columns are:
 
-| column | meaning |
+| Column | Meaning |
 |---|---|
 | `smiles` | the molecule |
 | `target` | the label: a number, or one of two classes |
@@ -77,7 +77,7 @@ only**. Test rows are only ever predicted.
   it like everything else, `--forest-inner-cv` uses inner cross-validation instead. That fits each config once
   per inner fold and then refits the winner, so it is about 5× slower.
 
-| name | what it is | grid |
+| Name | What it is | Grid |
 |---|---|---|
 | The Mean | the training-set mean, or the class prior | none (zero parameters, zero shots, zero GPUs) |
 | Large Lookup Model | k-nearest neighbors with Tanimoto distance | k ∈ {1, 3, 5, 10} × {uniform, distance} weights × radius ∈ {2, 3} |
@@ -104,14 +104,16 @@ number, the hyperparameters chosen on each test set, and the baselines' predicti
 
 ## Flags
 
-| flag | effect |
+| Flag | Effect |
 |---|---|
 | `--seriously` | plain output with no jokes, for logs and papers |
 | `--brag "fine-tuned for a week on a TPU pod"` | changes how the forest describes your training |
 | `--forest-inner-cv` | picks the forest's hyperparameters by inner CV instead of out-of-bag score. About 5× slower, and it warns you. |
 | `--fail-if-forest-wins` | exits 1 if the forest won, so a CI pipeline goes red when your model loses |
 | `--task regression\|binary` | overrides the task. By default a target with 2 values is binary. |
-| `--seed`, `--n-jobs`, `--alpha` | what you'd expect |
+| `--seed 0` | the random seed for the forest's trees and the inner CV splits. Default 0. In `forestgump demo` it also sets the demo's folds and noise. |
+| `--n-jobs -1` | how many CPU cores the forest uses. Default -1, meaning all of them. |
+| `--alpha 0.05` | the significance level: the forest wins or loses only when the Holm-adjusted p is below it. It also sets the confidence intervals to 1 − alpha. Default 0.05. |
 
 ## License
 
