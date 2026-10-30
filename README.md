@@ -77,9 +77,11 @@ report.to_json("forest.json")
 Each baseline is retrained on every training set, and its hyperparameters are picked from **that training set
 only**. Test rows are only ever predicted.
 
-- **Retrieval-Augmented Mean** appears only with `--context`, and it has nothing to tune. For each test row it
-  retrieves the training rows with the same context values and averages their labels. A group with no training
-  rows gets the training-set mean, and the report says how many test rows that happened to.
+- **The Mean** has nothing to tune. It predicts the training-set mean for every test row, or for a two-class
+  target the training share of the larger class.
+- **Retrieval-Augmented Mean** appears only with `--context`, and it has nothing to tune either. For each test
+  row it retrieves the training rows with the same context values and averages their labels. A group with no
+  training rows gets the training-set mean, and the report says how many test rows that happened to.
 - **Large Lookup Model** uses inner cross-validation, which takes milliseconds for kNN: 5 folds, or 3 below 50
   training rows.
 - **The Forest** fits each of its 12 configs once and keeps the one with the best out-of-bag score. Every tree
