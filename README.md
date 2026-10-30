@@ -9,8 +9,9 @@ fingerprints?
 
 forestgump takes your molecules as SMILES, plus your labels, your cross-validation folds and your model's
 out-of-fold predictions. It fits three baselines on **exactly the same folds**: the training mean, Tanimoto kNN on
-Morgan fingerprints, and a random forest on Morgan fingerprints. Then it runs a paired test to decide whether your
-model beat the forest.
+Morgan fingerprints, and a random forest on Morgan fingerprints. Name a context column, such as an assay, a
+chemical series or a reaction's catalyst, and it adds a fourth: the context mean. Then it runs a paired test to
+decide whether your model beat the forest.
 
 ```
 Your model, trained on 8×H100 for 3 days, lost to a random forest. The forest trained in 31 seconds on a CPU.
@@ -54,12 +55,18 @@ forestgump run my_results.csv --smiles SMILES --target y --fold cv_fold --pred m
 For **repeated** cross-validation, add one row per (molecule, repeat) and pass `--repeat repeat_column`. The test
 set of (repeat r, fold f) is those rows. Its training set is every other row of repeat r.
 
+To add the context mean, name one or more context columns. With several, a group is one combination of their values.
+
+```bash
+forestgump run my_results.csv --context catalyst base
+```
+
 From Python:
 
 ```python
 import forestgump
 
-report = forestgump.run(df, smiles="smiles", target="target", fold="fold", pred="pred")
+report = forestgump.run(df, smiles="smiles", target="target", fold="fold", pred="pred", context=["catalyst", "base"])
 print(report.verdict)  # "win", "lose", "tie", or "refuse"
 print(report.render())
 report.to_json("forest.json")
@@ -80,6 +87,7 @@ only**. Test rows are only ever predicted.
 | Name | What it is | Grid |
 |---|---|---|
 | The Mean | the training-set mean, or the class prior | none (zero parameters, zero shots, zero GPUs) |
+| Retrieval-Augmented Mean | only with `--context`: the mean label of the training rows in the test row's group, or the training-set mean if the group has no training rows | none (it is a groupby) |
 | Large Lookup Model | k-nearest neighbors with Tanimoto distance | k ∈ {1, 3, 5, 10} × {uniform, distance} weights × radius ∈ {2, 3} |
 | The Forest | a random forest with 500 trees | max_features ∈ {sqrt, 0.3, 1.0} × min_samples_leaf ∈ {1, 3} × radius ∈ {2, 3} |
 
@@ -95,7 +103,7 @@ and Spearman ρ, or accuracy.
    resampled t-test**. CV training sets overlap, so the differences are correlated and a plain paired t-test is
    overconfident. The correction inflates the variance by `1/J + n_test/n_train` over J test sets
    (Nadeau & Bengio 2003; Bouckaert & Frank 2004 for repeated CV).
-3. The three p-values are Holm-adjusted.
+3. The p-values, three or four with `--context`, are Holm-adjusted together.
 4. The verdict compares you with the forest at α = 0.05: **win**, **lose**, or **tie**. With fewer than 3 test
    sets the forest declines to be judged.
 
@@ -110,6 +118,7 @@ number, the hyperparameters chosen on each test set, and the baselines' predicti
 | `--brag "fine-tuned for a week on a TPU pod"` | changes how the forest describes your training |
 | `--forest-inner-cv` | picks the forest's hyperparameters by inner CV instead of out-of-bag score. About 5× slower, and it warns you. |
 | `--fail-if-forest-wins` | exits 1 if the forest won, so a CI pipeline goes red when your model loses |
+| `--context catalyst base` | adds the context mean, grouping rows by these columns. The report says how many test rows had a group with no training rows and fell back to the training-set mean. |
 | `--task regression\|binary` | overrides the task. By default a target with 2 values is binary. |
 | `--seed 0` | the random seed for the forest's trees and the inner CV splits. Default 0. In `forestgump demo` it also sets the demo's folds and noise. |
 | `--n-jobs -1` | how many CPU cores the forest uses. Default -1, meaning all of them. |

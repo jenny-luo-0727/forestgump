@@ -72,6 +72,7 @@ def refuse(n_cells: int) -> str:
 
 # These follow any forest verdict: a model can beat the forest and still lose to kNN or the mean.
 LOST_TO_MEAN = "Your model lost to the mean. The mean is one number."
+LOST_TO_CONTEXT = "Your model lost to the context mean. It does in-context learning. Without the learning."
 LOST_TO_KNN = "Your model lost to the nearest-neighbor lookup. It is a lookup table."
 
 

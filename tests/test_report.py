@@ -6,23 +6,23 @@ from forestgump.report import Comparison, Report
 from forestgump.stats import PairedTest
 
 
-def report(forest_delta, forest_p, mean_delta=0.0, mean_p=1.0, n_cells=5, knn_delta=0.0, knn_p=1.0):
+def report(forest_delta, forest_p, mean_delta=0.0, mean_p=1.0, n_cells=5, knn_delta=0.0, knn_p=1.0, context_delta=None):
     tests = []
+    baselines = [("mean", mean_delta, mean_p), ("knn", knn_delta, knn_p), ("forest", forest_delta, forest_p)]
+    if context_delta is not None:
+        baselines.insert(1, ("context", context_delta, 0.01))
     if n_cells >= 3:
-        for method, delta, p in (
-            ("mean", mean_delta, mean_p),
-            ("knn", knn_delta, knn_p),
-            ("forest", forest_delta, forest_p),
-        ):
+        for method, delta, p in baselines:
             tests.append(Comparison(method, PairedTest(n_cells, delta, delta - 1, delta + 1, 1.0, p, 1.0), p))
-    table = pd.DataFrame({"cell": [0], "method": ["user"], "rmse": [1.0]})
+    table = pd.DataFrame({"cell": [0], "method": ["user"], "n_test": [21], "rmse": [1.0]})
+    selections = [{"cell": 0, "method": "forest", "params": {"radius": 2, "n_estimators": 500}, "selection_score": 0.5}]
+    if context_delta is not None:
+        selections.append({"cell": 0, "method": "context", "params": {}, "n_test_unseen_context": 4})
     return Report(
         task="regression",
         primary="rmse",
         table=table,
-        selections=[
-            {"cell": 0, "method": "forest", "params": {"radius": 2, "n_estimators": 500}, "selection_score": 0.5}
-        ],
+        selections=selections,
         predictions=pd.DataFrame(),
         comparisons=tests,
         n_cells=n_cells,
@@ -31,6 +31,7 @@ def report(forest_delta, forest_p, mean_delta=0.0, mean_p=1.0, n_cells=5, knn_de
         forest_leaves=1234,
         alpha=0.05,
         seed=0,
+        context=("ligand", "base") if context_delta is not None else (),
     )
 
 
@@ -63,6 +64,16 @@ def test_brag_and_seconds_in_the_losing_line():
 
 def test_extra_burn_for_losing_to_the_mean():
     assert jokes.LOST_TO_MEAN in report(-0.5, 0.001, mean_delta=-0.2, mean_p=0.01).render()
+
+
+def test_context_mean_is_described_tested_and_can_burn():
+    text = report(0.5, 0.001, context_delta=-0.2).render()
+    assert "sharing the test row's ligand, base. 4 of 21 test rows had no such training row" in text
+    assert "Holm across the 4 baselines" in text and "Retrieval-Augmented Mean (context mean)" in text
+    assert "cannot clap" in text and jokes.LOST_TO_CONTEXT in text
+    assert report(0.5, 0.001, context_delta=0.2).to_dict()["context_columns"] == ["ligand", "base"]
+    plain = report(0.5, 0.001)
+    assert "Holm across the 3 baselines" in plain.render() and "context mean" not in plain.render().lower()
 
 
 def test_seriously_has_no_jokes():

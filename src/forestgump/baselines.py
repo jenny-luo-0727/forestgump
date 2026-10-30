@@ -1,4 +1,4 @@
-"""The three baselines, their small grids, and grid selection on training rows only."""
+"""The baselines, their small grids, and grid selection on training rows only."""
 
 from __future__ import annotations
 
@@ -16,10 +16,12 @@ from .stats import LOWER_IS_BETTER, PRIMARY, metrics
 
 N_TREES = 500
 METHODS = ("mean", "knn", "forest")
+METHODS_WITH_CONTEXT = ("mean", "context", "knn", "forest")
 FOREST_SELECTION = ("oob", "inner-cv")
 
 GRIDS: dict[str, list[dict]] = {
     "mean": [{}],
+    "context": [{}],
     "knn": [
         {"radius": r, "n_neighbors": k, "weights": w}
         for r, k, w in itertools.product((2, 3), (1, 3, 5, 10), ("uniform", "distance"))
@@ -31,8 +33,27 @@ GRIDS: dict[str, list[dict]] = {
 }
 
 
+class ContextMean:
+    """Predict the mean training target of the test row's context group, or the training mean for a group that has
+    no training rows. For a binary target that mean is the group's frequency of the larger class."""
+
+    def fit(self, codes: np.ndarray, y: np.ndarray):
+        self.fallback_ = float(np.mean(y))
+        self.means_ = {g: float(np.mean(y[codes == g])) for g in np.unique(codes)}
+        return self
+
+    def predict(self, codes: np.ndarray) -> np.ndarray:
+        return np.array([self.means_.get(g, self.fallback_) for g in codes], dtype=float)
+
+    def predict_proba(self, codes: np.ndarray) -> np.ndarray:
+        p = self.predict(codes)
+        return np.column_stack([1 - p, p])
+
+
 def _model(method: str, task: str, params: dict, n_train: int, seed: int, n_jobs: int):
     binary = task == "binary"
+    if method == "context":
+        return ContextMean()
     if method == "mean":
         return DummyClassifier(strategy="prior") if binary else DummyRegressor(strategy="mean")
     if method == "knn":
@@ -81,7 +102,8 @@ def predict(model, task: str, X: np.ndarray) -> np.ndarray:
 def fit_predict(method, task, params, X, y, train_idx, test_idx, seed, n_jobs):
     """Fit one configuration on rows train_idx of X and predict rows test_idx. Returns (predictions, fitted model).
 
-    X is the config's fingerprint matrix over all rows (`fingerprints_for`), or None for the mean baseline.
+    X is the config's fingerprint matrix over all rows (`fingerprints_for`), the per-row context group codes for the
+    context mean, or None for the mean baseline.
     """
     model = _model(method, task, params, len(train_idx), seed, n_jobs)
     X_fit, X_pred = _features(method, X, train_idx, test_idx)

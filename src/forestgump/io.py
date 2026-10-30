@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -37,6 +38,8 @@ class Dataset:
     mol_index: np.ndarray
     cells: tuple[Cell, ...]
     classes: tuple | None = None
+    context: np.ndarray | None = None  # per-row group code over the context columns, if any were given
+    context_columns: tuple[str, ...] = ()
 
     @property
     def test_train_ratio(self) -> float:
@@ -120,14 +123,17 @@ def load(
     pred: str = "pred",
     repeat: str | None = None,
     task: str | None = None,
+    context: str | Sequence[str] | None = None,
 ) -> Dataset:
     """Validate a frame with one row per (molecule, repeat) and return the paired test cells.
 
     The test set of cell (r, f) is the rows with ``repeat == r`` and ``fold == f``; its training set is every
     other row of repeat r. `pred` holds the user's model's prediction for the row when it was in the test set:
-    a value for regression, the probability of the larger class label for binary.
+    a value for regression, the probability of the larger class label for binary. `context` names the column(s)
+    whose combined values define a row's context group for the context-mean baseline.
     """
-    columns = [smiles, target, fold, pred] + ([repeat] if repeat else [])
+    context_columns = (context,) if isinstance(context, str) else tuple(context or ())
+    columns = [smiles, target, fold, pred] + ([repeat] if repeat else []) + list(context_columns)
     missing = [c for c in columns if c not in df.columns]
     if missing:
         raise InputError(f"missing columns {missing}; the frame has {list(df.columns)}")
@@ -153,4 +159,15 @@ def load(
     repeats = df[repeat] if repeat else pd.Series(0, index=df.index)
     cells = _build_cells(df[fold], repeats)
     _check_cells(cells, task, y)
-    return Dataset(task=task, y=y, pred=p, mols=mols, mol_index=mol_index, cells=cells, classes=classes)
+    codes = df.groupby(list(context_columns), sort=False).ngroup().to_numpy() if context_columns else None
+    return Dataset(
+        task=task,
+        y=y,
+        pred=p,
+        mols=mols,
+        mol_index=mol_index,
+        cells=cells,
+        classes=classes,
+        context=codes,
+        context_columns=context_columns,
+    )

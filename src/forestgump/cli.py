@@ -38,6 +38,13 @@ def _parser() -> argparse.ArgumentParser:
     r.add_argument("--pred", default="pred", help="your model's out-of-fold prediction column (default: pred)")
     r.add_argument("--repeat", default=None, help="repeat column for repeated CV (default: one repeat)")
     r.add_argument("--task", choices=TASKS, default=None, help="default: binary if the target has 2 values")
+    r.add_argument(
+        "--context",
+        nargs="+",
+        default=None,
+        metavar="COL",
+        help="column(s) defining a context group; adds the context mean, which predicts each group's training mean",
+    )
     d = sub.add_parser("demo", help="judge a pretend model on 105 synthetic molecules labelled with Crippen logP")
     d.add_argument("--model", choices=MODELS, default="noise", help="noise loses, oracle wins (default: noise)")
     d.add_argument("--repeats", type=int, default=1, help="repeats of 5-fold CV (default: 1)")
@@ -75,7 +82,7 @@ def main(argv: list[str] | None = None) -> int:
         columns = {"repeat": "repeat"}
     else:
         frame = pd.read_csv(args.csv)
-        columns = {k: getattr(args, k) for k in ("smiles", "target", "fold", "pred", "repeat", "task")}
+        columns = {k: getattr(args, k) for k in ("smiles", "target", "fold", "pred", "repeat", "task", "context")}
     if args.forest_inner_cv:
         print(f"forestgump: {INNER_CV_WARNING}", file=sys.stderr, flush=True)
     try:

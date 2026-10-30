@@ -16,10 +16,17 @@ from .stats import LOWER_IS_BETTER, METRICS, PairedTest
 GOOFY_NAMES = {
     "user": "Your model",
     "mean": "The Mean",
+    "context": "Retrieval-Augmented Mean (context mean)",
     "knn": "Large Lookup Model (Tanimoto kNN)",
     "forest": "The Forest (Morgan RF)",
 }
-SERIOUS_NAMES = {"user": "user model", "mean": "mean", "knn": "kNN (Tanimoto)", "forest": "random forest (Morgan)"}
+SERIOUS_NAMES = {
+    "user": "user model",
+    "mean": "mean",
+    "context": "context mean",
+    "knn": "kNN (Tanimoto)",
+    "forest": "random forest (Morgan)",
+}
 
 
 @dataclass(frozen=True)
@@ -45,6 +52,7 @@ class Report:
     seed: int
     classes: tuple | None = None
     forest_selection: str = "oob"
+    context: tuple[str, ...] = ()
 
     @property
     def _forest_selection_text(self) -> str:
@@ -76,6 +84,8 @@ class Report:
             f"(the forest by {self._forest_selection_text}, kNN by inner CV). "
             f"Primary metric: {self.primary} ({direction} is better)."
         )
+        if self.context:
+            out.append(self._context_text())
 
         table = self.table.assign(method=self.table["method"].map(names))
         out += ["", "Per-test-set results", table.to_string(index=False, float_format=lambda v: f"{v:.4g}")]
@@ -84,7 +94,8 @@ class Report:
             out += [
                 "",
                 f"Paired tests on {self.primary}: Nadeau-Bengio corrected t over {self.n_cells} test sets "
-                f"(mean n_test/n_train = {self.test_train_ratio:.3f}), Holm across the 3 baselines.",
+                f"(mean n_test/n_train = {self.test_train_ratio:.3f}), "
+                f"Holm across the {len(self.comparisons)} baselines.",
                 f"delta > 0 means your model did better. CI is the unadjusted {1 - self.alpha:.0%} interval.",
                 self._tests_frame(names).to_string(index=False, float_format=lambda v: f"{v:.4g}"),
             ]
@@ -129,9 +140,20 @@ class Report:
             lines = [jokes.tie(forest.p_holm)]
         if self._outcome("mean") == "lose":
             lines.append(jokes.LOST_TO_MEAN)
+        if self._outcome("context") == "lose":
+            lines.append(jokes.LOST_TO_CONTEXT)
         if self._outcome("knn") == "lose":
             lines.append(jokes.LOST_TO_KNN)
         return "\n".join(lines)
+
+    def _context_text(self) -> str:
+        unseen = sum(s["n_test_unseen_context"] for s in self.selections if s["method"] == "context")
+        n_test = int(self.table.loc[self.table["method"] == "user", "n_test"].sum())
+        return (
+            f"The context mean predicts the mean training target of the rows sharing the test row's "
+            f"{', '.join(self.context)}. {unseen} of {n_test} test rows had no such training row and got the "
+            "training mean."
+        )
 
     def _forest_configs(self) -> str:
         picks = Counter(
@@ -157,6 +179,7 @@ class Report:
                 "alpha": self.alpha,
                 "seed": self.seed,
                 "forest_selection": self.forest_selection,
+                "context_columns": list(self.context),
                 "verdict": self.verdict,
                 "forest_seconds": self.forest_seconds,
                 "per_test_set": self.table.to_dict(orient="records"),

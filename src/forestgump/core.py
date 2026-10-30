@@ -5,9 +5,10 @@ from __future__ import annotations
 import time
 import warnings
 
+import numpy as np
 import pandas as pd
 
-from .baselines import FOREST_SELECTION, METHODS, fingerprints_for, fit_predict, predict, select
+from .baselines import FOREST_SELECTION, METHODS, METHODS_WITH_CONTEXT, fingerprints_for, fit_predict, predict, select
 from .featurize import Fingerprints
 from .io import load
 from .report import Comparison, Report
@@ -28,6 +29,7 @@ def run(
     pred: str = "pred",
     repeat: str | None = None,
     task: str | None = None,
+    context: str | list[str] | None = None,
     seed: int = 0,
     n_jobs: int = -1,
     alpha: float = 0.05,
@@ -38,24 +40,27 @@ def run(
     See `forestgump.io.load` for the input contract. Hyperparameters are chosen per cell from that cell's training
     rows only; test rows are only ever predicted. kNN always uses inner CV. The forest uses its out-of-bag score
     by default (one fit per config); forest_selection="inner-cv" uses inner CV instead, at about 5x the time.
+    Naming `context` column(s) adds a fourth baseline, the context mean: each test row gets the mean training
+    target of the rows that share its context values, or the training mean if no training row does.
     """
     if forest_selection not in FOREST_SELECTION:
         raise ValueError(f"forest_selection must be one of {FOREST_SELECTION}, got {forest_selection!r}")
     if forest_selection == "inner-cv":
         warnings.warn(INNER_CV_WARNING, stacklevel=2)
-    ds = load(df, smiles=smiles, target=target, fold=fold, pred=pred, repeat=repeat, task=task)
+    ds = load(df, smiles=smiles, target=target, fold=fold, pred=pred, repeat=repeat, task=task, context=context)
     fps = Fingerprints(ds.mols, ds.mol_index)
+    methods = METHODS if ds.context is None else METHODS_WITH_CONTEXT
     rows, selections, predictions = [], [], []
     forest_seconds, n_leaves = 0.0, 0
     for i, cell in enumerate(ds.cells):
         base = {"cell": i, "repeat": cell.repeat, "fold": cell.fold, "n_train": len(cell.train_idx)}
         base["n_test"] = len(cell.test_idx)
         rows.append(base | {"method": "user"} | metrics(ds.task, ds.y[cell.test_idx], ds.pred[cell.test_idx]))
-        for method in METHODS:
+        for method in methods:
             start = time.perf_counter()
             sel = select(method, ds.task, fps, ds.y, cell.train_idx, seed, n_jobs, forest_selection)
             if sel.model is None:
-                X = fingerprints_for(fps, sel.params)
+                X = ds.context if method == "context" else fingerprints_for(fps, sel.params)
                 p, model = fit_predict(
                     method, ds.task, sel.params, X, ds.y, cell.train_idx, cell.test_idx, seed, n_jobs
                 )
@@ -67,7 +72,11 @@ def run(
                 n_leaves = sum(int(t.get_n_leaves()) for t in model.estimators_)
             rows.append(base | {"method": method} | metrics(ds.task, ds.y[cell.test_idx], p))
             predictions.append(pd.DataFrame({"cell": i, "row": cell.test_idx, "method": method, "pred": p}))
-            selections.append({"cell": i, "method": method, "params": sel.params, "selection_score": sel.score})
+            selection = {"cell": i, "method": method, "params": sel.params, "selection_score": sel.score}
+            if method == "context":
+                seen = np.isin(ds.context[cell.test_idx], ds.context[cell.train_idx])
+                selection["n_test_unseen_context"] = int((~seen).sum())
+            selections.append(selection)
 
     table = pd.DataFrame(rows)
     primary = PRIMARY[ds.task]
@@ -76,9 +85,9 @@ def run(
     if len(ds.cells) >= MIN_CELLS:
         tests = [
             corrected_t(improvement(primary, wide["user"].to_numpy(), wide[m].to_numpy()), ds.test_train_ratio, alpha)
-            for m in METHODS
+            for m in methods
         ]
-        for m, t, p_adj in zip(METHODS, tests, holm([t.p for t in tests]), strict=True):
+        for m, t, p_adj in zip(methods, tests, holm([t.p for t in tests]), strict=True):
             comparisons.append(Comparison(method=m, test=t, p_holm=p_adj))
     return Report(
         task=ds.task,
@@ -95,4 +104,5 @@ def run(
         seed=seed,
         classes=ds.classes,
         forest_selection=forest_selection,
+        context=ds.context_columns,
     )

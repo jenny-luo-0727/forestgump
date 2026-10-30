@@ -32,6 +32,22 @@ def test_missing_column():
         load(frame(), pred="my_model")
 
 
+def test_context_columns_must_exist_and_be_filled():
+    with pytest.raises(InputError, match=r"missing columns \['series'\]"):
+        load(frame(), context="series")
+    df = frame().assign(series="a", batch="x")
+    df.loc[3, "series"] = None
+    with pytest.raises(InputError, match="'series' is empty in rows 3"):
+        load(df, context=["batch", "series"])
+
+
+def test_context_groups_combine_the_columns():
+    df = frame().assign(a=np.arange(105) % 2, b=np.arange(105) % 3)
+    ds = load(df, context=["a", "b"])
+    assert ds.context_columns == ("a", "b") and len(np.unique(ds.context)) == 6
+    assert load(df, context="a").context_columns == ("a",) and load(df).context is None
+
+
 def test_bad_smiles_names_the_row():
     with pytest.raises(InputError, match="rows 7"):
         load(frame(smiles=(7, "c1ccc")))

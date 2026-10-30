@@ -15,11 +15,15 @@ def test_demo_noise_loses_and_ci_fails(small_forest, tmp_path, capsys):
 
 def test_run_on_a_csv(small_forest, tmp_path, capsys):
     path = tmp_path / "oracle.csv"
-    demo_frame("oracle").rename(columns={"pred": "my_model"}).to_csv(path, index=False)
+    df = demo_frame("oracle").rename(columns={"pred": "my_model"})
+    df.assign(series=df.index % 3, batch="b").to_csv(path, index=False)
     out = tmp_path / "forest.json"
-    code = main(["run", str(path), "--pred", "my_model", "--repeat", "repeat", "--n-jobs", "2", "--json", str(out)])
+    argv = ["run", str(path), "--pred", "my_model", "--repeat", "repeat", "--context", "series", "batch"]
+    code = main([*argv, "--n-jobs", "2", "--json", str(out)])
     assert code == 0
-    assert json.loads(out.read_text())["verdict"] == "win"
+    result = json.loads(out.read_text())
+    assert result["verdict"] == "win" and result["context_columns"] == ["series", "batch"]
+    assert [t["baseline"] for t in result["paired_tests"]] == ["mean", "context", "knn", "forest"]
 
 
 def test_bad_input_exits_2(tmp_path, capsys):
