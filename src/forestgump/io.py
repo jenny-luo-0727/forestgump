@@ -29,17 +29,18 @@ class Cell:
 
 @dataclass(frozen=True)
 class Dataset:
-    """Validated input. Row order follows the input frame; `mol_index` maps each row to `mols`."""
+    """Validated input. Row order follows the input frame; `mol_index[:, j]` maps SMILES column j to `mols`."""
 
     task: str
     y: np.ndarray
     pred: np.ndarray
     mols: tuple
-    mol_index: np.ndarray
+    mol_index: np.ndarray  # (n_rows, n_smiles_columns)
     cells: tuple[Cell, ...]
     classes: tuple | None = None
     context: np.ndarray | None = None  # per-row group code over the context columns, if any were given
     context_columns: tuple[str, ...] = ()
+    smiles_columns: tuple[str, ...] = ("smiles",)
 
     @property
     def test_train_ratio(self) -> float:
@@ -55,7 +56,9 @@ def _rows(mask: np.ndarray, limit: int = 10) -> str:
 
 
 def _parse_smiles(smiles: np.ndarray) -> tuple[tuple, np.ndarray]:
+    """Parse the unique SMILES of an (n_rows, n_columns) array; return the molecules and an index of the same shape."""
     unique, inverse = np.unique(smiles.astype(str), return_inverse=True)
+    inverse = inverse.reshape(smiles.shape)
     RDLogger.DisableLog("rdApp.*")
     try:
         mols = [Chem.MolFromSmiles(s) for s in unique]
@@ -63,7 +66,9 @@ def _parse_smiles(smiles: np.ndarray) -> tuple[tuple, np.ndarray]:
         RDLogger.EnableLog("rdApp.*")
     bad = np.array([m is None for m in mols])
     if bad.any():
-        raise InputError(f"RDKit could not parse SMILES in rows {_rows(bad[inverse])}: {list(unique[bad][:5])}")
+        raise InputError(
+            f"RDKit could not parse SMILES in rows {_rows(bad[inverse].any(axis=1))}: {list(unique[bad][:5])}"
+        )
     return tuple(mols), inverse
 
 
@@ -117,7 +122,7 @@ def _check_cells(cells: tuple[Cell, ...], task: str, y: np.ndarray) -> None:
 def load(
     df: pd.DataFrame,
     *,
-    smiles: str = "smiles",
+    smiles: str | Sequence[str] = "smiles",
     target: str = "target",
     fold: str = "fold",
     pred: str = "pred",
@@ -130,10 +135,14 @@ def load(
     The test set of cell (r, f) is the rows with ``repeat == r`` and ``fold == f``; its training set is every
     other row of repeat r. `pred` holds the user's model's prediction for the row when it was in the test set:
     a value for regression, the probability of the larger class label for binary. `context` names the column(s)
-    whose combined values define a row's context group for the context-mean baseline.
+    whose combined values define a row's context group for the context-mean baseline. Several `smiles` columns
+    (e.g. the components of a reaction) are fingerprinted separately and their fingerprints concatenated.
     """
+    smiles_columns = (smiles,) if isinstance(smiles, str) else tuple(smiles)
+    if not smiles_columns:
+        raise InputError("name at least one SMILES column")
     context_columns = (context,) if isinstance(context, str) else tuple(context or ())
-    columns = [smiles, target, fold, pred] + ([repeat] if repeat else []) + list(context_columns)
+    columns = [*smiles_columns, target, fold, pred] + ([repeat] if repeat else []) + list(context_columns)
     missing = [c for c in columns if c not in df.columns]
     if missing:
         raise InputError(f"missing columns {missing}; the frame has {list(df.columns)}")
@@ -155,7 +164,7 @@ def load(
                 f"rows {_rows(outside)} are outside [0, 1]"
             )
 
-    mols, mol_index = _parse_smiles(df[smiles].to_numpy())
+    mols, mol_index = _parse_smiles(df[list(smiles_columns)].to_numpy())
     repeats = df[repeat] if repeat else pd.Series(0, index=df.index)
     cells = _build_cells(df[fold], repeats)
     _check_cells(cells, task, y)
@@ -170,4 +179,5 @@ def load(
         classes=classes,
         context=codes,
         context_columns=context_columns,
+        smiles_columns=smiles_columns,
     )

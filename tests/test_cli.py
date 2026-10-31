@@ -38,3 +38,15 @@ def test_forest_inner_cv_prints_one_clean_warning(small_forest, recwarn, capsys)
     err = capsys.readouterr().err
     assert err.count("about 5x slower") == 1 and "UserWarning" not in err
     assert not [w for w in recwarn if "inner-cv" in str(w.message)]
+
+
+def test_run_with_several_smiles_columns(small_forest, tmp_path, capsys):
+    path, out = tmp_path / "components.csv", tmp_path / "forest.json"
+    df = demo_frame("noise").drop(columns="repeat")
+    df.assign(solvent=["O" if i % 2 else "CCO" for i in range(len(df))]).to_csv(path, index=False)
+    assert (
+        main(["run", str(path), "--smiles", "smiles", "solvent", "--seriously", "--n-jobs", "2", "--json", str(out)])
+        == 0
+    )
+    assert "one 2048-bit Morgan block per SMILES column (smiles, solvent)" in capsys.readouterr().out
+    assert json.loads(out.read_text())["smiles_columns"] == ["smiles", "solvent"]

@@ -23,7 +23,7 @@ INNER_CV_WARNING = (
 def run(
     df: pd.DataFrame,
     *,
-    smiles: str = "smiles",
+    smiles: str | list[str] = "smiles",
     target: str = "target",
     fold: str = "fold",
     pred: str = "pred",
@@ -42,6 +42,8 @@ def run(
     by default (one fit per config); forest_selection="inner-cv" uses inner CV instead, at about 5x the time.
     Naming `context` column(s) adds a fourth baseline, the context mean: each test row gets the mean training
     target of the rows that share its context values, or the training mean if no training row does.
+    Several `smiles` columns (e.g. the components of a reaction) each get their own Morgan fingerprint block,
+    concatenated in column order; kNN's Tanimoto and the forest use the concatenated bits.
     """
     if forest_selection not in FOREST_SELECTION:
         raise ValueError(f"forest_selection must be one of {FOREST_SELECTION}, got {forest_selection!r}")
@@ -105,4 +107,5 @@ def run(
         classes=ds.classes,
         forest_selection=forest_selection,
         context=ds.context_columns,
+        smiles=ds.smiles_columns,
     )

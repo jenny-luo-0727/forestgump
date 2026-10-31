@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "forestgump"
-version = "0.1.0"
+version = "0.1.1"
 description = "Life is like a box of baselines. Did your cheminformatics model beat a random forest trained on Morgan fingerprints?"
 readme = "README.md"
 license = "Apache-2.0"

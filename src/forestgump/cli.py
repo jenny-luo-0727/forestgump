@@ -32,7 +32,14 @@ def _parser() -> argparse.ArgumentParser:
     )
     r.add_argument("csv")
     _shared(r)
-    r.add_argument("--smiles", default="smiles", help="SMILES column (default: smiles)")
+    r.add_argument(
+        "--smiles",
+        nargs="+",
+        default=["smiles"],
+        metavar="COL",
+        help="SMILES column(s); several (e.g. reaction components) get one fingerprint each, concatenated "
+        "(default: smiles)",
+    )
     r.add_argument("--target", default="target", help="label column (default: target)")
     r.add_argument("--fold", default="fold", help="test-fold column (default: fold)")
     r.add_argument("--pred", default="pred", help="your model's out-of-fold prediction column (default: pred)")

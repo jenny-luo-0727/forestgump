@@ -42,7 +42,7 @@ You need one CSV with one row per molecule. Its columns are:
 
 | Column | Meaning |
 |---|---|
-| `smiles` | the molecule |
+| `smiles` | the molecule (or several columns, one per reaction component; see below) |
 | `target` | the label: a number, or one of two classes |
 | `fold` | which test fold the row belongs to |
 | `pred` | your model's prediction for the row, made while it was in the test fold. For a two-class target, this is the probability of the larger class label. |
@@ -54,6 +54,14 @@ forestgump run my_results.csv --smiles SMILES --target y --fold cv_fold --pred m
 
 For **repeated** cross-validation, add one row per (molecule, repeat) and pass `--repeat repeat_column`. The test
 set of (repeat r, fold f) is those rows. Its training set is every other row of repeat r.
+
+For **reactions or mixtures**, name one SMILES column per component. Each column gets its own Morgan fingerprint
+and the fingerprints are concatenated, so a substructure in the ketone and the same substructure in the ligand set
+different bits. kNN's Tanimoto and the forest both use the concatenated fingerprint.
+
+```bash
+forestgump run my_results.csv --smiles ligand ketone base
+```
 
 To add the context mean, name one or more context columns. With several, a group is one combination of their values.
 

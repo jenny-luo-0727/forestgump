@@ -82,3 +82,15 @@ def test_tiny_training_set_is_refused():
     df["fold"] = [0, 1, 2, 0, 1, 2]
     with pytest.raises(InputError, match="not a shrub"):
         load(df)
+
+
+def test_several_smiles_columns_are_parsed_per_column():
+    df = frame().assign(solvent=np.where(np.arange(105) % 2, "O", "CCO"))
+    ds = load(df, smiles=["smiles", "solvent"])
+    assert ds.smiles_columns == ("smiles", "solvent") and ds.mol_index.shape == (105, 2)
+    assert {ds.mols[i].GetNumAtoms() for i in ds.mol_index[:, 1]} == {1, 3}
+    with pytest.raises(InputError, match=r"missing columns \['base'\]"):
+        load(df, smiles=["smiles", "base"])
+    df.loc[4, "solvent"] = "C1CC"
+    with pytest.raises(InputError, match="rows 4"):
+        load(df, smiles=["smiles", "solvent"])

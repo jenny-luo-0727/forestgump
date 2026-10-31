@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 
 from . import jokes
+from .featurize import FP_SIZE
 from .stats import LOWER_IS_BETTER, METRICS, PairedTest
 
 GOOFY_NAMES = {
@@ -53,6 +54,7 @@ class Report:
     classes: tuple | None = None
     forest_selection: str = "oob"
     context: tuple[str, ...] = ()
+    smiles: tuple[str, ...] = ("smiles",)
 
     @property
     def _forest_selection_text(self) -> str:
@@ -84,6 +86,11 @@ class Report:
             f"(the forest by {self._forest_selection_text}, kNN by inner CV). "
             f"Primary metric: {self.primary} ({direction} is better)."
         )
+        if len(self.smiles) > 1:
+            out.append(
+                f"Fingerprints: one {FP_SIZE}-bit Morgan block per SMILES column ({', '.join(self.smiles)}), "
+                "concatenated, so the same substructure in two columns sets two different bits."
+            )
         if self.context:
             out.append(self._context_text())
 
@@ -179,6 +186,7 @@ class Report:
                 "alpha": self.alpha,
                 "seed": self.seed,
                 "forest_selection": self.forest_selection,
+                "smiles_columns": list(self.smiles),
                 "context_columns": list(self.context),
                 "verdict": self.verdict,
                 "forest_seconds": self.forest_seconds,
