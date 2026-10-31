@@ -57,8 +57,8 @@ def test_refusal_below_three_cells():
 
 
 def test_brag_and_seconds_in_the_losing_line():
-    text = report(-0.5, 0.001).render(brag="fine-tuned for a week on a TPU pod")
-    assert "Your model, fine-tuned for a week on a TPU pod, lost to a random forest." in text
+    text = report(-0.5, 0.001).render(brag="a 3-billion-parameter foundation model")
+    assert "Your model, a 3-billion-parameter foundation model, lost to a random forest." in text
     assert "trained in 41 seconds" in text
 
 

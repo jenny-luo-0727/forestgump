@@ -120,7 +120,7 @@ number, the hyperparameters chosen on each test set, and the baselines' predicti
 | Flag | Effect |
 |---|---|
 | `--seriously` | plain output with no jokes, for logs and papers |
-| `--brag "fine-tuned for a week on a TPU pod"` | changes how the forest describes your training |
+| `--brag "a 3-billion-parameter foundation model"` | changes how the forest describes your training |
 | `--forest-inner-cv` | picks the forest's hyperparameters by inner CV instead of out-of-bag score. About 5× slower, and it warns you. |
 | `--fail-if-forest-wins` | exits 1 if the forest won, so a CI pipeline goes red when your model loses |
 | `--context catalyst base` | adds the context mean, grouping rows by these columns. The report says how many test rows had a group with no training rows and fell back to the training-set mean. |
